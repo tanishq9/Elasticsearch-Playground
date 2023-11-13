@@ -435,9 +435,154 @@ How date fields are stored?
 ### Reindex
 - We cannot update exist mapping for a field. The solution is to reindex documents into a new index.
 
-### Other Topics
-- Searching for data.
-- Joining queries.
-- Controlling query results (pagination).
-- Aggregations.
-- Improving search results.
+### Field alias
+- Field alias is used to add an alternate way to access the original value. We have to perform a mapping update with a path value.
+- Making comment field point to content:
+```
+curl --location --request PUT 'https://localhost:9200/reviews/_mapping' \
+--header 'Authorization: Basic ZWxhc3RpYzp0SmNIajFoYTlxSnNOKzUwWTRzKw==' \
+--header 'Content-Type: application/json' \
+--data '{
+    "properties": {
+        "comment": {
+            "type": "alias",
+            "path": "content" 
+        }
+    }
+}'
+```
+- An alias has no influence on how values are indexed. Its a query level construct.
+
+### Stemming and stop words
+- Stemming reduces words to their root form. Eg. loved -> love and drinking -> drink.
+- Stop words:
+  - Command words such as: "a", "the", "on", etc.
+  - Words that are filtered out during text analysis and provide little to no value for relevance scoring.
+  - The standard analyzer doesn't remove these stop words.
+  - The relevance algo has improved significantly so its not required.
+
+### Search query
+- Search query is analysed in the same way as when indexing the document.
+- Query DSL  is the search query defined as JSON within the request body.
+
+#### Term level query
+- Term level queries are used for exact matching (filtering).
+- Term level queries are not analyzed.
+  - The search value is used exactly as is for inverted index lookups.
+  - Searches are therefore case sensitive.
+- Term level queries can be used for data types such as keyword, numbers, dates, etc.
+- Don't use term level queries on text fields.
+
+#### Multi-field mappings
+- One field having multiple data types.
+- This allows us to use the "text" mapping for full-text searches and the "keyword" mapping for aggregation and sorting.
+  - This is one such usecase.
+  - In multi-field mappings, we have much more control of how values are indexed than just the data type. We can maybe have an additional mapping for the "description" field that is optimised for auto-completion and "search-as-you-type" functionality.
+
+```
+"tags": {
+    "type": "text",
+    "fields": {
+        "keyword": {
+            "type": "keyword"
+        }
+    }
+}
+```
+
+#### Range searches
+- Search within range inclusive of gte and lte values:
+```
+{
+    "query": {
+        "range": {
+            "in_stock": {
+                "gte": 1,
+                "lte": 5
+            }
+        }
+    }
+}
+```
+- To search within range exclusive of gte and lte values, use gt and lt instead:
+```
+{
+    "query": {
+        "range": {
+            "in_stock": {
+                "gt": 1,
+                "lt": 5
+            }
+        }
+    }
+}
+```
+
+### Prefixes, wildcards, & regular expressions
+- \* -> Matches 0 or more characters
+- \+ -> Matches 1 or more characters 
+- ? -> Matches a single character
+
+All prefix, regexp, wildcard and even term query are case sensitive by default. However all queries support a parameter called case_insensitive  which allows to perform case insensitive searches.
+
+Note:
+- Term level queries are not analyzed, because they are used to query data that was not analyzed during indexing.
+- Term level queries are not analyzed, and should therefore be used for matching data that has not been analyzed (i.e. keyword fields, dates, numbers, etc.).
+
+### Full text queries
+- Use full text queries to search unstructured text values.
+  - E.g. blog posts, emails, etc.
+- Full text queries are analysed in the same way as the fields that are queried.
+  - The standard analyzer is used incase none specified.
+
+### Match query
+- The search term is analyzed and the result is looked up in the field's inverted index.
+- If the analyzer outputs multiple terms, at least one must match by default.
+  - This can be changed by setting the operator parameter to "and".
+```
+ {
+    "query": {
+        "match": {
+            "name": {
+                "query": "Pasta chicken", // "pasta",
+                "operator": "and" // By default it is OR
+            }
+        }
+    }
+}
+```
+
+### Relevance scoring
+- Match query results are sorted descendingly by the _score metadata field.
+  - This relevance score is a floating point number of how well a document matches a query.
+- Documents matching term level queries are generally scored 1.0.
+  - Either a document matches, or it doesn't (simply filtered out)
+- Full text queries are not for exact matching
+  - How well a document matches is now a factor.
+  - The most relevant results are placed highest.
+
+### Searching multiple fields
+- multi_match query looks up the term in all the fields which are specified.
+```
+{
+    "query": {
+        "multi_match": {
+            "query": "vegetable",
+            "fields": [
+                "name^2",
+                "tags"
+            ]
+        }
+    }
+}
+```
+- This multi_match query is split into multiple search queries internally by ES.
+- By default one field is used for calculating a document's relevance score i.e. incase for a document the query occurs is multiple fields then the score for the field which has the highest relevance score is considered.
+- We can "reward" documents where multiple fields match by using the tie_breaker parameter. 
+  - Each matching field affects the relevance score.
+
+### Phrase searches
+- In match_phrase query, the order of terms matters.
+- Terms must appear in the correct order with no other terms in-between.
+- The standard analyzer outputs term positions that are stored within the field's inverted index.
+  - These positions are then used for phrase searches.
