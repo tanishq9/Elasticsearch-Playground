@@ -434,3 +434,10 @@ How date fields are stored?
 
 ### Reindex
 - We cannot update exist mapping for a field. The solution is to reindex documents into a new index.
+
+### Other Topics
+- Searching for data.
+- Joining queries.
+- Controlling query results (pagination).
+- Aggregations.
+- Improving search results.
