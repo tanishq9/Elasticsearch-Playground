@@ -586,3 +586,17 @@ Note:
 - Terms must appear in the correct order with no other terms in-between.
 - The standard analyzer outputs term positions that are stored within the field's inverted index.
   - These positions are then used for phrase searches.
+
+### Controlling Query Results
+
+#### Source filtering
+- We can filter the data returned in _source i.e. for documents returned as part of the search query. 
+  - This is done sometimes to reduce the amount of data transferred over the network to improve performance.
+
+#### Specifying the result size
+- We can limit the number of documents returned as result of search query. The default number of docs returned are 10.
+- We can mention the size field in query parameter or in request body to mention the number of documents we want.
+
+#### Aggregations
+- Aggregations are a way of grouping and extracting statistics and summaries from your data. 
+  - Aggregation works on a set of documents.
